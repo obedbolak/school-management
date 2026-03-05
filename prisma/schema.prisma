@@ -1,0 +1,345 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique @db.VarChar(255)
+  password       String?
+  name           String   @db.VarChar(150)
+  phone          String?  @db.VarChar(20)
+  role           Role     @default(STUDENT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  adminProfile   Admin?   @relation("AdminProfile")
+  parentProfile  Parent?  @relation("ParentProfile")
+  studentProfile Student? @relation("StudentProfile")
+  teacherProfile Teacher? @relation("TeacherProfile")
+
+  @@map("users")
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation("AdminProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admins")
+}
+
+model Teacher {
+  id                String             @id @default(uuid())
+  employeeId        String             @unique @db.VarChar(50)
+  firstName         String             @db.VarChar(100)
+  lastName          String             @db.VarChar(100)
+  gender            Gender?
+  phone             String?            @db.VarChar(20)
+  email             String?            @db.VarChar(255)
+  department        String?            @db.VarChar(100)
+  title             String?            @db.VarChar(50)
+  salaryBase        Decimal?           @db.Decimal(10, 2)
+  hireDate          DateTime?          @db.Date
+  userId            String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  courseAssignments CourseAssignment[]
+  salaryPayments    SalaryPayment[]
+  user              User?              @relation("TeacherProfile", fields: [userId], references: [id])
+
+  @@map("teachers")
+}
+
+model Student {
+  id             String             @id @default(uuid())
+  matricNo       String             @unique @db.VarChar(50)
+  firstName      String             @db.VarChar(100)
+  lastName       String             @db.VarChar(100)
+  dateOfBirth    DateTime           @db.Date
+  gender         Gender?
+  address        String?
+  phone          String?            @db.VarChar(20)
+  enrollmentDate DateTime           @default(now()) @db.Date
+  status         StudentStatus      @default(ACTIVE)
+  departmentId   String?
+  level          Int?               @default(100)
+  parentId       String?
+  userId         String?            @unique
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  attendances    Attendance[]
+  enrollments    CourseEnrollment[]
+  feePayments    FeePayment[]
+  department     Department?        @relation(fields: [departmentId], references: [id])
+  parent         Parent?            @relation(fields: [parentId], references: [id])
+  user           User?              @relation("StudentProfile", fields: [userId], references: [id])
+
+  @@index([departmentId])
+  @@index([parentId])
+  @@index([status])
+  @@index([level])
+  @@map("students")
+}
+
+model Parent {
+  id         String    @id @default(uuid())
+  firstName  String    @db.VarChar(100)
+  lastName   String    @db.VarChar(100)
+  phone      String    @unique @db.VarChar(20)
+  email      String?   @db.VarChar(255)
+  address    String?
+  occupation String?   @db.VarChar(100)
+  userId     String?   @unique
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User?     @relation("ParentProfile", fields: [userId], references: [id])
+  children   Student[]
+
+  @@map("parents")
+}
+
+model Department {
+  id        String    @id @default(uuid())
+  name      String    @unique @db.VarChar(150)
+  code      String    @unique @db.VarChar(20)
+  faculty   String?   @db.VarChar(150)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  courses   Course[]
+  students  Student[]
+
+  @@map("departments")
+}
+
+model Course {
+  id           String             @id @default(uuid())
+  code         String             @unique @db.VarChar(20)
+  name         String             @db.VarChar(200)
+  description  String?
+  creditHours  Int                @default(3)
+  level        Int                @default(100)
+  departmentId String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  assignments  CourseAssignment[]
+  department   Department?        @relation(fields: [departmentId], references: [id])
+
+  @@index([departmentId])
+  @@index([level])
+  @@map("courses")
+}
+
+model CourseAssignment {
+  id               String             @id @default(uuid())
+  courseId         String
+  teacherId        String
+  academicYear     String             @db.VarChar(20)
+  semester         Semester
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  attendances      Attendance[]
+  course           Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher          Teacher            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments      CourseEnrollment[]
+  timetableEntries TimetableEntry[]
+
+  @@unique([courseId, teacherId, academicYear, semester])
+  @@index([teacherId])
+  @@index([courseId])
+  @@index([academicYear, semester])
+  @@map("course_assignments")
+}
+
+model CourseEnrollment {
+  id                 String           @id @default(uuid())
+  studentId          String
+  courseAssignmentId String
+  enrollmentStatus   EnrollmentStatus @default(ENROLLED)
+  grade              String?          @db.VarChar(5)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseAssignmentId])
+  @@index([studentId])
+  @@index([courseAssignmentId])
+  @@index([enrollmentStatus])
+  @@map("course_enrollments")
+}
+
+model Attendance {
+  id                 String           @id @default(uuid())
+  date               DateTime         @db.Date
+  status             AttendanceStatus
+  remarks            String?
+  studentId          String
+  courseAssignmentId String
+  createdAt          DateTime         @default(now())
+  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseAssignmentId, date])
+  @@index([date])
+  @@index([courseAssignmentId])
+  @@index([studentId])
+  @@map("attendances")
+}
+
+model Room {
+  id               String           @id @default(uuid())
+  name             String           @unique @db.VarChar(100)
+  building         String?          @db.VarChar(100)
+  capacity         Int?
+  type             String?          @db.VarChar(50)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  timetableEntries TimetableEntry[]
+
+  @@map("rooms")
+}
+
+model TimeSlot {
+  id               String           @id @default(uuid())
+  startTime        String           @db.VarChar(5)
+  endTime          String           @db.VarChar(5)
+  label            String           @db.VarChar(50)
+  createdAt        DateTime         @default(now())
+  timetableEntries TimetableEntry[]
+
+  @@unique([startTime, endTime])
+  @@map("time_slots")
+}
+
+model TimetableEntry {
+  id                 String           @id @default(uuid())
+  courseAssignmentId String
+  dayOfWeek          DayOfWeek
+  timeSlotId         String
+  roomId             String?
+  academicYear       String           @db.VarChar(20)
+  semester           Semester
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  room               Room?            @relation(fields: [roomId], references: [id])
+  timeSlot           TimeSlot         @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, dayOfWeek, timeSlotId, academicYear, semester])
+  @@unique([courseAssignmentId, dayOfWeek, timeSlotId])
+  @@index([courseAssignmentId])
+  @@index([dayOfWeek])
+  @@index([academicYear, semester])
+  @@map("timetable_entries")
+}
+
+model FeePayment {
+  id            String         @id @default(uuid())
+  studentId     String
+  amount        Decimal        @db.Decimal(10, 2)
+  paidAmount    Decimal        @default(0) @db.Decimal(10, 2)
+  paymentDate   DateTime?
+  dueDate       DateTime       @db.Date
+  feeType       String         @db.VarChar(100)
+  semester      Semester?
+  academicYear  String?        @db.VarChar(20)
+  method        PaymentMethod?
+  receiptNumber String?        @unique @db.VarChar(100)
+  status        PaymentStatus  @default(PENDING)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("fee_payments")
+}
+
+model SalaryPayment {
+  id          String        @id @default(uuid())
+  teacherId   String
+  amount      Decimal       @db.Decimal(10, 2)
+  paymentDate DateTime
+  monthYear   String        @db.VarChar(7)
+  status      PaymentStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  teacher     Teacher       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, monthYear])
+  @@index([teacherId])
+  @@index([monthYear])
+  @@map("salary_payments")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum StudentStatus {
+  ACTIVE
+  GRADUATED
+  SUSPENDED
+  DROPPED_OUT
+  DEFERRED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  SICK
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum Semester {
+  FIRST
+  SECOND
+  SUMMER
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  DROPPED
+  COMPLETED
+  FAILED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
